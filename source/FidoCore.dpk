@@ -119,7 +119,7 @@ contains
   Fido.DesignPatterns.Adapter.JSonArrayAsReadonlyList in 'DesignPatterns\Fido.DesignPatterns.Adapter.JSonArrayAsReadonlyList.pas',
   Fido.JSON.Mapping in 'Json\Fido.JSON.Mapping.pas',
   Fido.OwningObject in 'Fido.OwningObject.pas',
-  Fido.Collections.UpdateablePerThreadDictionary in 'Collections\Fido.Collections.UpdateablePerThreadDictionary.pas',
+  Fido.Collections.UpdateablePerXDictionary in 'Collections\Fido.Collections.UpdateablePerXDictionary.pas',
   Fido.Environment.Vault.Intf in 'Environment\Fido.Environment.Vault.Intf.pas',
   Fido.Http.RequestInfo.Intf in 'Http\Fido.Http.RequestInfo.Intf.pas',
   Fido.DesignPatterns.Adapter.TIdHTTPRequestInfoAsIHTTPRequestInfo in 'DesignPatterns\Fido.DesignPatterns.Adapter.TIdHTTPRequestInfoAsIHTTPRequestInfo.pas',
@@ -167,9 +167,13 @@ contains
   Fido.Boxes in 'Fido.Boxes.pas',
   Fido.Async.Funcs in 'Async\Fido.Async.Funcs.pas',
   Fido.Async.Procs in 'Async\Fido.Async.Procs.pas',
-  Fido.Api.Server.Abstract in 'Api\Server\Fido.Api.Server.Abstract.pas';
+  Fido.Api.Server.Abstract in 'Api\Server\Fido.Api.Server.Abstract.pas',
+  Fido.Logging.Appenders.PermanentFile in 'Logging\Fido.Logging.Appenders.PermanentFile.pas',
+  Fido.Slots.Attributes in 'Slots\Fido.Slots.Attributes.pas',
+  Fido.Slots.Binding in 'Slots\Fido.Slots.Binding.pas',
+  Fido.Slots.Intf in 'Slots\Fido.Slots.Intf.pas',
+  Fido.Slots in 'Slots\Fido.Slots.pas',
+  Fido.Collections.PerXDictionary.Intf in 'Collections\Fido.Collections.PerXDictionary.Intf.pas',
+  Fido.Db.Connections.FireDac.PerThread in 'Db\Fido.Db.Connections.FireDac.PerThread.pas';
 
 end.
-
-
-
