@@ -36,6 +36,7 @@ uses
   System.Threading,
   System.SysUtils,
   System.Classes,
+  System.IOUtils,
 
   Spring,
   Spring.Collections,
@@ -70,6 +71,7 @@ implementation
 
 { TPerThreadDictionary<T> }
 
+{$ifdef MSWINDOWS}
 function TPerThreadDictionary<T>.GetThreadsList: TArray<TThreadId>;
 var
   SnapProcHandle: THandle;
@@ -99,9 +101,28 @@ begin
     CloseHandle(SnapProcHandle);
   end;
 end;
+{$endif}
+{$ifdef POSIX}
+function TPerThreadDictionary<T>.GetThreadsList: TArray<TThreadId>;
+var
+  List: IList<TThreadId>;
+begin
+  List := TCollections.CreateList<TThreadId>;
+  TCollections.CreateList<string>(TDirectory.GetDirectories(Format('/Proc/%d/task', [MainThreadID]))).ForEach(
+    procedure(const Item: string)
+    var
+      Value: Integer;
+    begin
+      if TryStrToInt(Item, Value) then
+        List.Add(Value);
+    end);
+  Result := List.ToArray;
+end;
+{$endif}
 
 procedure TPerThreadDictionary<T>.PerformGarbageCollection;
 var
+  ThreadIds: TArray<TThreadId>;
   LiveThreads: ISet<TThreadId>;
   GarbageThreads: ISet<TThreadId>;
 begin
@@ -111,16 +132,23 @@ begin
   if not Assigned(FLock) then
     Exit;
 
+  FLock.BeginRead;
+  try
+    ThreadIds := FItems.Keys.ToArray;
+  finally
+    FLock.EndRead;
+  end;
+
+  TCollections.CreateList<TThreadId>(ThreadIds).ForEach(
+    procedure(const Id: TThreadId)
+    begin
+      if not LiveThreads.Contains(Id) and
+         (Id <> Integer(MainThreadID)) then
+        GarbageThreads.Add(Id);
+    end);
+
   FLock.BeginWrite;
   try
-    FItems.Keys.ForEach(
-      procedure(const Id: TThreadId)
-      begin
-        if not LiveThreads.Contains(Id) and
-           (Id <> Integer(MainThreadID)) then
-          GarbageThreads.Add(Id);
-      end);
-
     GarbageThreads.ForEach(
       procedure(const Id: TThreadId)
       begin
@@ -144,15 +172,15 @@ begin
     procedure
     var
       Index: Integer;
-      Task: Weak<ITask>;
     begin
-      Task := FGarbageTask;
       while true do
       begin
-        if not Assigned(FGarbageTask) then
-          Exit;
         for Index := 1 to 10 do
+        begin
+          if TTask.CurrentTask.Status = TTaskStatus.Canceled then
+            Exit;
           Sleep(100);
+        end;
         PerformGarbageCollection;
       end;
     end);
@@ -161,6 +189,8 @@ end;
 destructor TPerThreadDictionary<T>.Destroy;
 begin
   FGarbageTask.Cancel;
+  Sleep(100);
+  PerformGarbageCollection;
   inherited;
 end;
 
