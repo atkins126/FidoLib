@@ -1,5 +1,5 @@
 (*
- * Copyright 2021 Mirko Bianco (email: writetomirko@gmail.com)
+ * Copyright 2022 Mirko Bianco (email: writetomirko@gmail.com)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,35 +20,43 @@
  * SOFTWARE.
  *)
 
- unit Fido.Slots.Intf;
+unit Fido.Virtual.Attributes;
 
 interface
 
-uses
-  System.SysUtils,
-  System.Rtti,
-
-  Spring,
-
-  Fido.Exceptions,
-  Fido.DesignPatterns.Observer.Intf,
-  Fido.DesignPatterns.Observable.Intf;
-
 type
-  TSlotType = (stSynched, stNotSynched);
+  PagingLimitAttribute = class(TCustomAttribute);
 
-  ESlots = class(EFidoException);
+  PagingOffsetAttribute = class(TCustomAttribute);
 
-  ISlots = interface(IObserver)
-    ['{72785413-37E9-41EE-B3BA-FCBFDFE8BFFF}']
+{ SqlInject parameters allow to change SQL scripts in a way that is not allowed by normal parameters
 
-    procedure Register(const SignalActor: IObservable; const Message: string; const SlotType: TSlotType; const SlotActor: TObject; const TypInfo: pTypeInfo; const MethodName: string;
-      const MapParams: TFunc<TArray<TValue>, TArray<TValue>> = nil); overload;
-    procedure Register(const SignalActor: IObservable; const Message: string; const SlotType: TSlotType; const Slot: Spring.TAction<TArray<TValue>>); overload;
+  Example:
 
-    procedure UnregisterSignalActor(const SignalActor: IObservable);
-  end deprecated 'Please use In Memory Event Driven Architecture interfaces';
+  [Statement(stQuery, 'Q_AN_EXAMPLE_QUERY')]
+  function Open(const [SqlInject('ORDERBY')] OrderBy: string);
+
+  Will replace the tag %ORDERBY% of the sql resource called Q_AN_EXAMPLE_QUERY with the content of the OrderBy parameter:
+  'select * from somequery order by %ORDERBY%' }
+
+  SqlInjectAttribute = class(TCustomAttribute)
+  private
+    FTag: string;
+  public
+    constructor Create(const Tag: string);
+
+    property Tag: string read FTag;
+  end;
 
 implementation
+
+{ SqlInjectAttribute }
+
+constructor SqlInjectAttribute.Create(const Tag: string);
+begin
+  inherited Create;
+
+  FTag := Tag;
+end;
 
 end.
