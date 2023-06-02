@@ -31,10 +31,7 @@ uses
   System.Math,
   System.JSON,
   System.Generics.Collections,
-
-  IdURI,
-  IdHTTP,
-  IdSSLOpenSSL,
+  System.NetEncoding,
 
   Spring,
   Spring.Collections,
@@ -62,7 +59,7 @@ type
 
     FHost: string;
     FSecured: Boolean;
-    FCustomHeaders: Shared<TStrings>;
+    FCustomHeaders: IShared<TStringList>;
     FOnError: TWebSocketOnError;
     FOnReceivedWebsocketMessage: TWebSocketOnReceivedMessage;
 
@@ -107,8 +104,8 @@ begin
 
   FHost := Host;
   FSecured := Secured;
-  FCustomHeaders := TStringList.Create;
-  FCustomHeaders.Value.AddStrings(CustomHeaders);
+  FCustomHeaders := Shared.Make(TStringList.Create);
+  FCustomHeaders.AddStrings(CustomHeaders);
   FWebSocketClient := Utilities.CheckNotNullAndSet(WebSocketClient, 'WebSocketClient');
   FOnError := OnError;
 
@@ -119,15 +116,15 @@ begin
  {$REGION ' OnReceivedWebsocketMessage '}
   FOnReceivedWebsocketMessage := procedure(const Message: string)
     var
-      JsonObject: Shared<TJSONObject>;
+      JsonObject: IShared<TJSONObject>;
       TryProcessMethodsResults: TTryProcessJson;
       TryReceivedData: TTryProcessJson;
     begin
       if Message = '{}' then
         Exit;
 
-      JsonObject := TJSONValue.ParseJSONValue(Message) as TJSONObject;
-      if not Assigned(JsonObject.Value) then
+      JsonObject := Shared.Make(TJSONObject.ParseJSONValue(Message) as TJSONObject);
+      if not Assigned(JsonObject) then
         Exit;
 
      {$REGION ' Manage methods callbacks '}
@@ -207,9 +204,9 @@ constructor TSignalR.Create(
   const WebSocketClient: IWebSocketClient;
   const OnError: TWebSocketOnError);
 var
-  CustomHeaders: Shared<TStrings>;
+  CustomHeaders: IShared<TStringList>;
 begin
-  CustomHeaders := TStringList.Create;
+  CustomHeaders := Shared.Make(TStringList.Create);
   Create(Host, Secured, CustomHeaders, OnReceivedMessage, WebSocketClient, OnError);
 end;
 
@@ -256,7 +253,7 @@ var
   Response: string;
   Url: string;
 begin
-  Url := TIdURI.URLEncode(
+  Url := TNetEncoding.URL.Encode(
     Utilities.IfThen<string>(Secured, 'https://', 'http://') + Host + '/SignalR/negotiate');
 
   Response := FWebSocketClient.Get(Url, CustomHeaders);
@@ -273,19 +270,19 @@ procedure TSignalR.Connect(
   const OnError: TWebSocketOnError);
 var
   Url: string;
-  CustomHeaders: Shared<TStringList>;
+  CustomHeaders: IShared<TStringList>;
 begin
-  Url := TIdURI.URLEncode(Utilities.IfThen(Secured, 'https://', 'http://') + Host + '/SignalR/connect' +
+  Url := TNetEncoding.URL.Encode(Utilities.IfThen(Secured, 'https://', 'http://') + Host + '/SignalR/connect' +
     '?transport=webSockets' +
     '&clientProtocol=' + NegotiationResponse.ProtocolVersion +
     '&connectionToken=' + NegotiationResponse.ConnectionToken +
     '&connectionId=' + NegotiationResponse.ConnectionId);
 
-  CustomHeaders := TStringList.Create;
+  CustomHeaders := Shared.Make(TStringList.Create);
 
   FWebSocketClient.Start(
     Url,
-    CustomHeaders.Value,
+    CustomHeaders,
     OnReceivedMessage,
     OnError);
 end;

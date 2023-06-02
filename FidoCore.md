@@ -15,6 +15,7 @@ Below is a list of the most important features:
 - [Functional programming](#functional-programming)
 - [Currying](#Currying)
 - [Caching](#Caching)
+- [Channels](#Channels)
 
 ## Mappers
 Unit: `Fido.Mappers`.
@@ -362,7 +363,9 @@ The virtual database clients are interfaces that represent database statements (
 ##### Connectivity
 
 Fido library enables the connection to databases through implementations of the `IStatementExecutor` interface.
-In FidoCore the FireDAC implementation is already available through the classes `TFireDacStatementExecutor` and `TFireDacConnections`.
+In FidoFireDac the FireDAC implementation is already available through the classes `TFireDacStatementExecutor` and `TFireDacConnections`.
+
+Ado and ZeosDB implementation are also available from the FidoAdo and FidoZeos packages.
 
 The virtual database clients will use the `IStatementExecutor` internally to reach the database. All of this is possible when registering the classes into the DI container (I said DI container, not global container...). 
 
@@ -861,20 +864,22 @@ Virtual Apis servers classes allow you to create Api servers quickly.
 
 #### Servers
 
-A server is the engine that will respond to incoming requests. Fido library provides already and Indy implementation, but feel free to implement your own, as long as it implements the `IApiServer` interface:
+A server is the engine that will respond to incoming requests. Fido library provides already an Indy and a Brook implementation, but feel free to implement your own, as long as it implements the `IApiServer` interface:
 
 ```pascal
   IApiServer = interface(IInvokable)
     ['{AA282BB3-418E-4835-8752-73D8DCCD326A}']
 
+    function Port: Word;
     function IsActive: Boolean;
     procedure SetActive(const Value: Boolean);
-
+    procedure SetWebServer(const WebServer: IWebServer);
     procedure RegisterResource(const Resource: TObject);
-    procedure RegisterWebSocket(const WebSocketClass: TClass);
-    procedure RegisterRequestMiddleware(const Name: string; const Step: TRequestMiddlewareFunc);
-    procedure RegisterResponseMiddleware(const Name: string; const Step: TResponseMiddlewareProc);
-    procedure RegisterExceptionMiddleware(const Middleware: TExceptionMiddlewareProc);
+    procedure RegisterRequestMiddleware(const Name: string; const Step: TApiRequestMiddlewareFunc);
+    procedure RegisterResponseMiddleware(const Name: string; const Step: TApiResponseMiddlewareProc);
+    procedure RegisterExceptionMiddleware(const MiddlewareProc: TApiExceptionMiddlewareProc);
+    procedure RegisterGlobalMiddleware(const MiddlewareProc: TApiGlobalMiddlewareProc);
+    procedure RegisterFormatExceptionToResponse(const FormatExceptionToResponseProc: TApiFormatExceptionToResponseProc);
   end;
 ```
 
@@ -905,13 +910,13 @@ begin
   RestServer := TIndyApiServer.Create(
     8080,
     50,
-    TFileWebServer.Create(
-      'public',
-      'index.html'),
     TSSLCertData.CreateEmpty);
   try
     try
       RestServer.RegisterResource(TTestResource.Create);
+      RestServer.SetWeBserver(TFileWebServer.Create(
+        'public',
+        'index.html'));
       RestServer.SetActive(True);
 
       Readln;
@@ -1275,8 +1280,6 @@ begin
 end;
 ```
 
-You can also set up a typed client, that adds typed functionalities to `IWebSocketClient`. 
-
 ### Consul and Fabio support
 
 Unit: `Fido.Api.Server.Consul`.
@@ -1312,7 +1315,6 @@ After that the `TConsulAwareApiServer` will simply decorate the `IApiServer` and
         TIndyApiServer.Create(
           IniFile.ReadInteger('Server', 'Port', 8080),
           IniFile.ReadInteger('Server', 'MaxConnections', 50),
-          TNullWebServer.Create,
           TSSLCertData.CreateEmpty),
         Container.Resolve<IConsulService>,
         IniFile.ReadString('Server', 'ServiceName', 'Authentication'));
@@ -1756,7 +1758,7 @@ var
   Result: Context<Boolean>;
 begin
   //Try something and manage exceptions
-  &Try<string>.New('100s').Map<Integer>(StrToInt).Match(function(const E: TObject): Integer
+  &Try<string>.New('100s').Map<Integer>(StrToInt).Match(function(const E: Exception): Nullable<Integer>
     begin
       //Manage the exceptions
     end);
@@ -1771,7 +1773,7 @@ begin
     end);
   
   //Try something, manage exceptions and finally do something
-  &Try<string>.New('100s').Map<Integer>(StrToInt).Match(function(const E: TObject): Integer
+  &Try<string>.New('100s').Map<Integer>(StrToInt).Match(function(const E: Exception): Nullable<Integer>
     begin
       //Manage the exception
     end,
@@ -1787,7 +1789,7 @@ begin
   TryOut<Integer>.New(function: Integer
     begin
       // Get the value somehow
-    end).Match(function(const E: TObject): Integer
+    end).Match(function(const E: Exception): Nullable<Integer>
     begin
       //Manage the exceptions
     end);
@@ -1811,7 +1813,7 @@ begin
   TryOut<Integer>(function: Integer
     begin
       // Get the value somehow
-    end).Match(function(const E: TObject): Integer
+    end).Match(function(const E: Exception): Nullable<Integer>
     begin
       //Manage the exception
     end,
@@ -1924,7 +1926,7 @@ begin
 end;
   
 begin
-  Result := Writeln(Curry.Cook<Integer, Integer, Integer>(Add)(1)(2)); //This will return 3
+  Result := Curry.Cook<Integer, Integer, Integer>(Add)(1)(2); //This will return 3
 end;
 ```
 
@@ -2030,3 +2032,346 @@ begin
 end.
 ```
 
+## Channels
+
+Units: `Fido.channels`.
+
+> Don't communicate by sharing memory; share memory by communicating.
+
+*Go koan.*
+
+> *Channels* are the pipes that connect concurrent goroutines. You can send values into channels from one goroutine and receive those values into another goroutine.
+
+from [Go By Example](https://gobyexample.com/channels)
+
+Channels are tools implemented in modern languages like Go and Rust, so for a decent description of what they are it's probably better if you read those languages documentation.
+
+Long story short, they are one-directional pipes that are sized (allowing only some data to pass at any time) and blocking (as in, it blocks the sender if the pipe is full, and it blocks the receiver if the pipeline is empty).
+
+Our implementation allows non-blocking behavior too.
+
+**Blocking behavior**
+
+```pascal
+begin
+  var Chan := Channels.Make<Boolean>;
+  
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Writeln('working...');
+      Sleep(1000);
+      Writeln('Done');
+      Chan.Send(True);
+    end).Start;
+
+  Chan.Receive;
+  Writeln('Received');
+  Readln;
+end.
+```
+
+Output:
+
+```shell
+working...
+Done
+Received
+```
+
+**Non-Blocking behavior**
+
+```pascal
+begin
+  var Chan := Channels.Make<string>;
+  var Value: string;
+
+  Chan.Send('test');
+  
+  if Chan.TrySend('another test') then
+    Writeln('Sent again')
+  else
+    Writeln('Cannot send again. Channel is full');
+
+  if Chan.TryReceive(Value) then
+    Writeln('Received');
+
+  Readln;
+end.
+```
+
+Output:
+
+```shell
+Cannot send again. Channel is full
+Received
+```
+
+**Buffered channels**
+
+```pascal
+begin
+  var Chan := Channels.Make<Boolean>(2);
+  var Value: Boolean;
+  
+  Chan.Send(True);
+  Writeln('Sent');
+  Chan.Send(True);
+  Writeln('Sent again');
+  Value := Chan.Receive;
+  Writeln('Received');
+  Value := Chan.Receive;
+  Writeln('Received again');
+  if Chan.TryReceive(Value) then
+    Writeln('Received a third time')
+  else
+    Writeln('Channel is empty. Cannot receive any further');
+  Readln;
+end.
+```
+
+Output:
+
+```shell
+Sent
+Sent again
+Received
+Received again
+Channel is empty. Cannot receive any further
+```
+
+**Channel directions**
+
+When you pass the channel as a parameter, sometimes you want to make sure that it will be used only to send or receive.
+
+```pascal
+begin
+  var Chan := Channels.Make<Boolean>;
+  
+  var SendChan := Chan.AsSender;
+  var RecChan := Chan.AsReceiver;
+end.
+```
+
+**Select**
+
+Use Select to wait on multiple channels operations. The following example will wait until both channels are queued with data.
+
+```pascal
+begin
+  var Stopwatch := TStopwatch.StartNew;
+  var C1 := Channels.Make<string>;
+  var C2 := Channels.Make<string>;
+
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(2000);
+      if Assigned(C1) then
+        C1.Send('One');
+    end).Start;
+
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(1000);
+      if Assigned(C2) then
+        C2.Send('Two');
+    end).Start;
+
+  var Select := Channels.Select;
+
+  Channels.Case<string>(Select, C1.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Channels.Case<string>(Select, C2.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Select.Run;
+
+  Writeln('Execution time: ', Stopwatch.Elapsed.TotalMilliseconds);
+  Readln;
+end;
+```
+
+Output:
+
+```shell
+Two
+One
+Execution time:  2.09054930000000E+0003
+```
+
+**Select with a timeout**
+
+You can set a timeout and a failed procedure, in case you are dealing with and external resource, or if you want to limit the execution time.
+
+```pascal
+begin
+  var Stopwatch := TStopwatch.StartNew;
+  var C1 := Channels.Make<string>;
+  var C2 := Channels.Make<string>;
+
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(2000);
+      if Assigned(C1) then
+        C1.Send('One');
+    end).Start;
+
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(1000);
+      if Assigned(C2) then
+        C2.Send('Two');
+    end).Start;
+
+  var Select := Channels.Select;
+
+  Channels.Case<string>(Select, C1.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Channels.Case<string>(Select, C2.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Select.Run(1500, procedure
+    begin
+      Writeln('Failed');
+    end);
+
+  Writeln('Execution time: ', Stopwatch.Elapsed.TotalMilliseconds);
+  Readln;
+end;
+```
+
+Output:
+
+```shell
+Two
+Failed
+Execution time:  1.53175820000000E+0003
+```
+
+**Non-blocking select**
+
+Use Select with a default action to achieve a non-blocking select.
+
+```pascal
+begin
+  var C1 := Channels.Make<string>;
+  var C2 := Channels.Make<string>;
+
+  C1.Send('One');
+
+  var Select := Channels.Select;
+
+  Channels.Case<string>(Select, C1.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Channels.Case<string>(Select, C2.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Select.Run(procedure
+      begin
+        Writeln('Default');
+      end);
+      
+  Select := Channels.Select;
+
+  Channels.Case<string>(Select, C1.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Channels.Case<string>(Select, C2.AsReceiver, procedure(const Value: string)
+    begin
+      Writeln(Value);
+    end);
+  Select.Run(procedure
+      begin
+        Writeln('Default');
+      end);
+
+  Readln;
+end;
+```
+
+Output:
+
+```shell
+One
+Default
+```
+
+**Closing channels**
+
+You can set a channel as closed. After a channel is closed sending will hang indefinitely, That is not a problem since it's the sender who's in control of the channel.
+
+ATTENTION: that means you should check for `Closed`, as sending through a closed channel will hang. The same for receiving on a empty closed channel.
+
+```pascal
+begin
+  var Channel := Channels.Make<Boolean>(2);
+
+  Channel.Send(True);
+  Channel.Send(True);
+
+  Channel.Close;
+  
+  // Channel.Send(True); <-- This would hang
+
+  if Channel.Closed then
+    Writeln('Closed')
+  else
+    Writeln('Not closed');
+
+  Channel.Receive;
+  Channel.Receive;
+
+  // Channel.Receive; <-- This would hang
+
+  if Channel.Closed then
+    Writeln('Closed')
+  else
+    Writeln('Not closed');
+  
+  Readln;
+end;
+```
+
+Output:
+
+```shell
+Not closed
+Closed
+```
+
+**Enumerating closed channels**
+
+You can enumerate a closed channel. If you try to enumerate an open channel you receive an `EChannel` exception.
+
+```pascal
+begin
+  var Channel := Channels.Make<string>(2);
+
+  Channel.Send('One');
+  Channel.Send('Two');
+
+  Channel.Close;
+  
+  with Channel.GetEnumerator do
+    while MoveNext do
+      Writeln(Current);
+  
+  Readln;
+end;
+```
+
+Output:
+
+```shell
+One
+Two
+```

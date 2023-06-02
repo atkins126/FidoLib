@@ -11,7 +11,7 @@ uses
   Spring,
   Fido.Http.Types,
   Fido.Api.Server.Intf,
-  Fido.Api.Server.Indy,
+  Fido.Api.Server.Brook,
   Fido.Web.Server.Files,
   TestData in 'TestData.pas';
 
@@ -19,15 +19,18 @@ var
   RestServer: IApiServer;
 begin
   ReportMemoryLeaksOnShutdown := True;
-  RestServer := TIndyApiServer.Create(
+  RestServer := TBrookApiServer.Create(
     8080,
+    0,
+    False,
     50,
-    TFileWebServer.Create(
-      'public',
-      'index.html'),
+    mtJson,
     TSSLCertData.CreateEmpty);
   try
     try
+      RestServer.SetWebServer(TFileWebServer.Create(
+        'public',
+        'index.html'));
       RestServer.RegisterResource(TTestResource.Create);
       RestServer.SetActive(True);
 

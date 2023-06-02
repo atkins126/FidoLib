@@ -38,13 +38,24 @@ type
 
   TryOut<T> = record
   private
-    FFunctorFunc: TFunc<T>;
-    FMonadFunc: TFunc<Context<T>>;
+    FFunctorFunc: Func<T>;
+    FMonadFunc: Func<Context<T>>;
+    FOnFailure: OnFailureEvent<T>;
+    FOnFinally: TProc;
+    FExceptionClass: TExceptionClass;
+    FErrorMessage: string;
 
     function Resolve: T;
+
+    procedure DefaultOnFinally;
+    function DefaultOnFailure(const E: Exception): Nullable<T>;
+    function DoMatchOnFailureAndOnFinally: Context<T>;
+    function DoMatchOnFinally: Context<T>;
+    function DoMatchExceptionClassErrorMessageAndOnFinally: Context<T>;
   public
-    constructor New(const FunctorFunc: TFunc<T>); overload;
-    constructor New(const MonadFunc: TFunc<Context<T>>); overload;
+    constructor New(const FunctorFunc: Func<T>); overload;
+    constructor New(const MonadFunc: Func<Context<T>>); overload;
+    constructor New(const Context: Context<T>); overload;
 
     function Match(const OnFailure: OnFailureEvent<T>; const OnFinally: TProc = nil): Context<T>; overload;
     function Match(const ExceptionClass: TExceptionClass; const ErrorMessage: string = ''; const OnFinally: TProc = nil): Context<T>; overload;
@@ -61,6 +72,7 @@ type
 
     class operator Implicit(const Value: &Try<T>): Context<T>;
     class operator Implicit(const Value: Context<T>): &Try<T>;
+    class operator Implicit(const Value: T): &Try<T>;
 
     function Map<TOut>(const Func: Context<T>.FunctorFunc<TOut>): TryOut<TOut>; overload; //Functor and Applicative
     function Map<TOut>(const Func: Context<T>.MonadFunc<TOut>): TryOut<TOut>; overload; //Monad
@@ -88,6 +100,11 @@ begin
   Result := &Try<T>.New(Value);
 end;
 
+class operator &Try<T>.Implicit(const Value: T): &Try<T>;
+begin
+  Result := &Try<T>.New(Context<T>.New(Value));
+end;
+
 function &Try<T>.Map<TOut>(const Func: Context<T>.MonadFunc<TOut>): TryOut<TOut>;
 var
   LValue: Context<T>;
@@ -104,10 +121,10 @@ var
   LValue: Context<T>;
 begin
   LValue := FValue;
-  Result := TryOut<TOut>.New(function: TOut
+  Result := TryOut<TOut>.New(Context<TOut>.New(function: TOut
     begin
-      Result :=  LValue.Map<TOut>(Func);
-    end);
+      Result := LValue.Map<TOut>(Func);
+    end));
 end;
 
 function &Try<T>.MapAsync<TOut>(
@@ -134,7 +151,7 @@ begin
     Result := True;
   except
     on E: Exception do
-      Result :=  False;
+      Result := False;
   end;
 end;
 
@@ -207,14 +224,14 @@ var
   LOnFailure: OnFailureEvent<T>;
   LOnFinally: TProc;
   LCalculatedValue: T;
+  Value: Nullable<T>;
 begin
   LOnFailure := OnFailure;
   LOnFinally := OnFinally;
 
   if not Assigned(LOnFailure) then
-    LOnFailure := function(const Exc: TObject): T
+    LOnFailure := function(const E: Exception): Nullable<T>
       begin
-        raise Exc;
       end;
   if not Assigned(LOnFinally) then
     LOnFinally := procedure
@@ -227,7 +244,12 @@ begin
       Result := LCalculatedValue;
     except
       on E: Exception do
-        Result :=  LOnFailure(E);
+      begin
+        Value := LOnFailure(E);
+        if not Value.HasValue then
+          raise;
+        Result := Value.Value;
+      end;
     end;
   finally
     LOnFinally();
@@ -246,55 +268,98 @@ end;
 {$ENDREGION}
 
 {$REGION ' TryOut<T> '}
-function TryOut<T>.Match(
-  const OnFailure: OnFailureEvent<T>;
-  const OnFinally: TProc): Context<T>;
-var
-  ExceptionObject: Shared<TObject>;
-  LOnFailure: OnFailureEvent<T>;
-  LOnFinally: TProc;
+function TryOut<T>.DefaultOnFailure(const E: Exception): Nullable<T>;
 begin
-  LOnFailure := OnFailure;
-  LOnFinally := OnFinally;
 
-  if not Assigned(LOnFailure) then
-    LOnFailure := function(const Exc: TObject): T
-      begin
-        raise Exc;
-      end;
-  if not Assigned(LOnFinally) then
-    LOnFinally := procedure
-      begin
-      end;
+end;
 
+procedure TryOut<T>.DefaultOnFinally;
+begin
+
+end;
+
+function TryOut<T>.DoMatchOnFailureAndOnFinally: Context<T>;
+var
+  Value: Nullable<T>;
+begin
   try
     try
       Result := Resolve;
     except
       on E: Exception do
-        Result := LOnFailure(E);
+      begin
+        Value := FOnFailure(E);
+        FOnFailure := nil;
+        if not Value.HasValue then
+          raise;
+        Result := Value.Value;
+      end;
     end;
   finally
-    LOnFinally();
+    FOnFinally();
+    FOnFinally := nil;
+  end;
+end;
+
+function TryOut<T>.Match(
+  const OnFailure: OnFailureEvent<T>;
+  const OnFinally: TProc): Context<T>;
+var
+  LSelf: Tryout<T>;
+begin
+  FOnFailure := OnFailure;
+  FOnFinally := OnFinally;
+
+  if not Assigned(FOnFailure) then
+    FOnFailure := LSelf.DefaultOnFailure;
+  if not Assigned(FOnFinally) then
+    FOnFinally := LSelf.DefaultOnFinally;
+
+  LSelf := Self;
+
+  Result := Context<T>.New(function: T
+    begin
+      Result := LSelf.DoMatchOnFailureAndOnFinally;
+    end);
+end;
+
+function TryOut<T>.DoMatchOnFinally: Context<T>;
+begin
+  try
+    Result := Resolve;
+  finally
+    FOnFinally();
   end;
 end;
 
 function TryOut<T>.Match(const OnFinally: TProc): Context<T>;
 var
-  ExceptionObject: Shared<TObject>;
-  LOnFinally: TProc;
+  LSelf: TryOut<T>;
 begin
-  LOnFinally := OnFinally;
+  FOnFinally := OnFinally;
 
-  if not Assigned(LOnFinally) then
-    LOnFinally := procedure
-      begin
-      end;
+  if not Assigned(FOnFinally) then
+    FOnFinally := LSelf.DefaultOnFinally;
 
+  LSelf := Self;
+
+  Result := Context<T>.New(function: T
+    begin
+      Result := LSelf.DoMatchOnFinally;
+    end);
+end;
+
+function TryOut<T>.DoMatchExceptionClassErrorMessageAndOnFinally: Context<T>;
+begin
   try
-    Result := Resolve;
+    try
+      Result := Resolve;
+    except
+      on E: Exception do
+        raise FExceptionClass.Create(Utilities.IfThen(FErrorMessage.IsEmpty, E.Message, Format(FErrorMessage, [E.Message])))
+    end;
   finally
-    LOnFinally();
+    FOnFinally();
   end;
 end;
 
@@ -303,28 +368,26 @@ function TryOut<T>.Match(
   const ErrorMessage: string;
   const OnFinally: TProc): Context<T>;
 var
+  LSelf: TryOut<T>;
   LOnFinally: TProc;
+  lResolve: Func<T>;
 begin
-  LOnFinally := OnFinally;
+  FExceptionClass := ExceptionClass;
+  FErrorMessage := ErrorMessage;
+  FOnFinally := OnFinally;
 
-  if not Assigned(LOnFinally) then
-    LOnFinally := procedure
-      begin
-      end;
+  if not Assigned(FOnFinally) then
+    FOnFinally := LSelf.DefaultOnFinally;
 
-  try
-    try
-      Result := Resolve;
-    except
-      on E: Exception do
-        raise ExceptionClass.Create(Utilities.IfThen(ErrorMessage.IsEmpty, E.Message, Format(ErrorMessage, [E.Message])))
-    end;
-  finally
-    LOnFinally();
-  end;
+  LSelf := Self;
+
+  Result := Context<T>.New(function: T
+    begin
+      Result := LSelf.DoMatchExceptionClassErrorMessageAndOnFinally;
+    end);
 end;
 
-constructor TryOut<T>.New(const MonadFunc: TFunc<Context<T>>);
+constructor TryOut<T>.New(const MonadFunc: Func<Context<T>>);
 begin
   FFunctorFunc := nil;
   FMonadFunc := MonadFunc;
@@ -338,9 +401,15 @@ begin
     Result := FMonadFunc();
 end;
 
-constructor TryOut<T>.New(const FunctorFunc: TFunc<T>);
+constructor TryOut<T>.New(const FunctorFunc: Func<T>);
 begin
   FFunctorFunc := FunctorFunc;
+  FMonadFunc := nil;
+end;
+
+constructor TryOut<T>.New(const Context: Context<T>);
+begin
+  FFunctorFunc := Context;
   FMonadFunc := nil;
 end;
 {$ENDREGION}

@@ -62,6 +62,9 @@ type
 
     class function CalculateHMACSHA512(const Value: string; const Salt: string): string; static;
     class function UNIXTimeInMilliseconds: Int64; static;
+
+    class procedure DeferSynchronization(const AnAction: Action; const Delay: Integer = 1); static;
+    class procedure Defer(const AnAction: Action; const Delay: Integer = 1); static;
   end;
 
 implementation
@@ -70,15 +73,15 @@ class function Utilities.CalculateHMACSHA512(
   const Value: string;
   const Salt: string): string;
 var
-  HMAC: Shared<TIdHMACSHA512>;
+  HMAC: IShared<TIdHMACSHA512>;
   Hash: TIdBytes;
 begin
   LoadOpenSSLLibrary;
   if not TIdHashSHA512.IsAvailable then
     raise Exception.Create('SHA256 hashing is not available!');
-  HMAC := TIdHMACSHA512.Create;
-  HMAC.Value.Key := IndyTextEncoding_UTF8.GetBytes(Salt);
-  Hash := HMAC.Value.HashValue(IndyTextEncoding_UTF8.GetBytes(Value));
+  HMAC := Shared.Make(TIdHMACSHA512.Create);
+  HMAC.Key := IndyTextEncoding_UTF8.GetBytes(Salt);
+  Hash := HMAC.HashValue(IndyTextEncoding_UTF8.GetBytes(Value));
   Result := ToHex(Hash).ToUpper;
 end;
 
@@ -136,6 +139,28 @@ class function Utilities.CheckNotNullAndSet<T>(
 begin
   Spring.Guard.CheckNotNull(Value, ArgumentName);
   Result := Value;
+end;
+
+class procedure Utilities.Defer(const AnAction: Action; const Delay: Integer = 1);
+begin
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(Delay);
+      AnAction();
+    end).Start;
+end;
+
+class procedure Utilities.DeferSynchronization(const AnAction: Action; const Delay: Integer = 1);
+begin
+  TThread.CreateAnonymousThread(procedure
+    begin
+      Sleep(Delay);
+
+      TThread.Synchronize(nil, procedure
+        begin
+          AnAction();
+        end);
+    end).Start;
 end;
 
 class function Utilities.F.IsNotEmpty(const Value: string): TCheckPredicate;

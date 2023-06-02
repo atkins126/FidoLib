@@ -71,6 +71,12 @@
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
+        <Cfg_2_Win32>true</Cfg_2_Win32>
+        <CfgParent>Cfg_2</CfgParent>
+        <Cfg_2>true</Cfg_2>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <DCC_E>false</DCC_E>
         <DCC_F>false</DCC_F>
@@ -85,6 +91,7 @@
         <VerInfo_Locale>8192</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;dxEMF.DataProvider;Winapi;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_DcuOutput>..\built\$(Platform)\$(Config)\Dcu</DCC_DcuOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Android)'!=''">
         <VerInfo_Keys>package=com.embarcadero.$(MSBuildProjectName);label=$(MSBuildProjectName);versionCode=1;versionName=1.0.0;persistent=False;restoreAnyVersion=False;installLocation=auto;largeHeap=False;theme=TitleBar;hardwareAccelerated=true;apiKey=</VerInfo_Keys>
@@ -139,12 +146,16 @@
     <PropertyGroup Condition="'$(Cfg_2_OSXARM64)'!=''">
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
-        <DCCReference Include="dbrtl.dcp"/>
         <DCCReference Include="CustomIPTransport.dcp"/>
         <DCCReference Include="IndySystem.dcp"/>
         <DCCReference Include="IndyProtocols.dcp"/>
@@ -156,10 +167,6 @@
         <DCCReference Include="Spring.Core.dcp"/>
         <DCCReference Include="Spring.Data.dcp"/>
         <DCCReference Include="JOSE.dcp"/>
-        <DCCReference Include="DbxCommonDriver.dcp"/>
-        <DCCReference Include="FireDAC.dcp"/>
-        <DCCReference Include="FireDACCommonDriver.dcp"/>
-        <DCCReference Include="FireDACCommon.dcp"/>
         <DCCReference Include="soaprtl.dcp"/>
         <DCCReference Include="Collections\Fido.Collections.DeepObservableList.pas"/>
         <DCCReference Include="Collections\Fido.Collections.pas"/>
@@ -246,19 +253,15 @@
         <DCCReference Include="Api\Client\VirtualApi\Fido.Api.Client.VirtualApi.Configuration.pas"/>
         <DCCReference Include="Api\Client\VirtualApi\Fido.Api.Client.VirtualApi.Intf.pas"/>
         <DCCReference Include="Api\Client\VirtualApi\Fido.Api.Client.VirtualApi.json.pas"/>
-        <DCCReference Include="Api\Client\VirtualApi\Fido.Api.Client.VirtualApi.Request.pas"/>
         <DCCReference Include="Api\Server\Fido.Api.Server.Exceptions.pas"/>
         <DCCReference Include="Api\Server\Fido.Api.Server.Indy.pas"/>
         <DCCReference Include="Api\Server\Fido.Api.Server.Intf.pas"/>
         <DCCReference Include="Api\Server\Resources\Fido.Api.Server.Resource.Attributes.pas"/>
-        <DCCReference Include="Db\Fido.Db.Connections.FireDac.pas"/>
         <DCCReference Include="Db\Fido.Db.ListDataset.pas"/>
         <DCCReference Include="Db\Fido.Db.Migrations.Model.Intf.pas"/>
         <DCCReference Include="Db\Fido.Db.Migrations.Model.pas"/>
         <DCCReference Include="Db\Fido.Db.Migrations.Repository.Intf.pas"/>
-        <DCCReference Include="Db\Fido.Db.ScriptRunner.FireDac.pas"/>
         <DCCReference Include="Db\Fido.Db.ScriptRunner.Intf.pas"/>
-        <DCCReference Include="Db\Fido.Db.StatementExecutor.FireDac.pas"/>
         <DCCReference Include="Db\Fido.Db.Transaction.Handler.Base.pas"/>
         <DCCReference Include="Db\Fido.Db.Transaction.Handler.Intf.pas"/>
         <DCCReference Include="Db\Fido.Db.Transaction.Intf.pas"/>
@@ -277,7 +280,6 @@
         <DCCReference Include="Api\Server\Fido.Api.Server.Abstract.pas"/>
         <DCCReference Include="Logging\Fido.Logging.Appenders.PermanentFile.pas"/>
         <DCCReference Include="Collections\Fido.Collections.PerXDictionary.Intf.pas"/>
-        <DCCReference Include="Db\Fido.Db.Connections.FireDac.PerThread.pas"/>
         <DCCReference Include="Api\Client\Consul\Fido.Api.Client.Consul.AgentService.V1.Intf.pas"/>
         <DCCReference Include="Api\Client\Consul\Fido.Api.Client.Consul.Configuration.pas"/>
         <DCCReference Include="Api\Client\Consul\Fido.Api.Client.Consul.Constants.pas"/>
@@ -346,8 +348,12 @@
         <DCCReference Include="Caching\Fido.Caching.ThreeParams.pas"/>
         <DCCReference Include="Caching\Fido.Caching.TwoParams.pas"/>
         <DCCReference Include="Caching\Fido.Caching.pas"/>
-        <DCCReference Include="Db\Fido.Db.Transaction.Handler.FireDac.pas"/>
         <DCCReference Include="Fido.Exceptions.Marshalling.pas"/>
+        <DCCReference Include="Fido.Channels.Impl.pas"/>
+        <DCCReference Include="Fido.Channels.Intf.pas"/>
+        <DCCReference Include="Fido.Channels.pas"/>
+        <DCCReference Include="EventsDriven\Fido.EventsDriven.pas"/>
+        <DCCReference Include="Fido.Functional.Logging.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -368,6 +374,12 @@
                 <Source>
                     <Source Name="MainSource">FidoCore.dpk</Source>
                 </Source>
+                <Excluded_Packages>
+                    <Excluded_Packages Name="\\dc1\userfiles$\m.bianco\Documents\Embarcadero\Studio\22.0\CatalogRepository\FMXAppWizard-280-1.0\FMXAppWizard280.bpl">FireMonkey App Wizard</Excluded_Packages>
+                    <Excluded_Packages Name="\\dc1\userfiles$\m.bianco\Documents\tmssoftware\graphql11\packages\d11\..\bpl\Win32\dclGraphQL280.bpl">GraphQL for Delphi - Design-Time Package</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k280.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp280.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                </Excluded_Packages>
             </Delphi.Personality>
             <Platforms>
                 <Platform value="Android">False</Platform>
@@ -1107,10 +1119,10 @@
                 </DeployClass>
                 <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSX64" Name="$(PROJECTNAME)"/>
+                <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Android64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="OSXARM64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Android" Name="$(PROJECTNAME)"/>
-                <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Linux64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>

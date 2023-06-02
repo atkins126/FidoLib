@@ -28,17 +28,19 @@ uses
   System.SysUtils,
   System.Threading,
 
+  Spring,
+
   Fido.Utilities,
   Fido.Functional;
 
 type
   ThenElse = record
   private
-    FFlagFunc: TFunc<Context<Boolean>>;
+    FFlagFunc: Func<Context<Boolean>>;
 
   public
     constructor New(const Flag: Context<Boolean>); overload;
-    constructor New(const FlagFunc: TFunc<Context<Boolean>>); overload;
+    constructor New(const FlagFunc: Func<Context<Boolean>>); overload;
 
     class operator Implicit(const Value: ThenElse): Context<Boolean>;
     class operator Implicit(const Value: Context<Boolean>): ThenElse;
@@ -66,10 +68,10 @@ type
   MonadThenElse<T> = record
   private
     FFlagFunc: Context<T>.MonadFunc<Boolean>;
-    FFuncValue: TFunc<T>;
+    FFuncValue: Func<T>;
 
   public
-    constructor New(const FlagFunc: Context<T>.MonadFunc<Boolean>; const FuncValue: TFunc<T>);
+    constructor New(const FlagFunc: Context<T>.MonadFunc<Boolean>; const FuncValue: Func<T>);
 
     function &Then<TOut>(const WhenTrue: Context<T>.FunctorFunc<TOut>; const WhenFalse: Context<TOut>): Context<TOut>; overload;
     function &Then<TOut>(const WhenTrue: Context<T>.FunctorFunc<TOut>): Context<TOut>; overload;
@@ -85,10 +87,11 @@ type
   public
     constructor New(const Value: T); overload;
     constructor New(const Value: Context<T>); overload;
-    constructor New(const Func: TFunc<T>); overload;
+    constructor New(const Func: Func<T>); overload;
 
     class operator Implicit(const Value: &If<T>): Context<T>;
     class operator Implicit(const Value: Context<T>): &If<T>;
+    class operator Implicit(const Value: T): &If<T>;
 
     function Map(const Func: Context<T>.FunctorFunc<Boolean>): FunctorThenElse<T>; overload; //Functor and Applicative
     function Map(const Func: Context<T>.MonadFunc<Boolean>): MonadThenElse<T>; overload; //Monad
@@ -103,6 +106,11 @@ begin
 end;
 
 class operator &If<T>.Implicit(const Value: Context<T>): &If<T>;
+begin
+  Result := &If<T>.New(Value);
+end;
+
+class operator &If<T>.Implicit(const Value: T): &If<T>;
 begin
   Result := &If<T>.New(Value);
 end;
@@ -133,7 +141,7 @@ begin
     end;
 end;
 
-constructor &If<T>.New(const Func: TFunc<T>);
+constructor &If<T>.New(const Func: Func<T>);
 begin
   FValue := Func;
 end;
@@ -177,7 +185,7 @@ begin
     end;
 end;
 
-constructor ThenElse.New(const FlagFunc: TFunc<Context<Boolean>>);
+constructor ThenElse.New(const FlagFunc: Func<Context<Boolean>>);
 begin
   FFlagFunc := FlagFunc;
 end;
@@ -234,9 +242,12 @@ var
 begin
   LSelf := Self;
   Result := function: TOut
+  var
+    Value: T;
   begin
-    if LSelf.FFlagFunc(LSelf.FValue) then
-      Result := WhenTrue(LSelf.FValue)
+    Value := LSelf.FValue;
+    if LSelf.FFlagFunc(Value) then
+      Result := WhenTrue(Value)
     else
       Result := WhenFalse;
   end;
@@ -248,17 +259,20 @@ var
 begin
   LSelf := Self;
   Result := function: TOut
+  var
+    Value: T;
   begin
-    if LSelf.FFlagFunc(LSelf.FValue) then
-      Result := WhenTrue(LSelf.FValue)
+    Value := LSelf.FValue;
+    if LSelf.FFlagFunc(Value) then
+      Result := WhenTrue(Value)
     else
-      Result := WhenFalse(LSelf.FValue);
+      Result := WhenFalse(Value);
   end;
 end;
 {$ENDREGION}
 
 {$REGION ' MonadThenElse<T> '}
-constructor MonadThenElse<T>.New(const FlagFunc: Context<T>.MonadFunc<Boolean>; const FuncValue: TFunc<T>);
+constructor MonadThenElse<T>.New(const FlagFunc: Context<T>.MonadFunc<Boolean>; const FuncValue: Func<T>);
 begin
   FFlagFunc := FlagFunc;
   FFuncValue := FuncValue;
@@ -332,5 +346,7 @@ begin
     end;
 end;
 {$ENDREGION}
+
+
 
 end.

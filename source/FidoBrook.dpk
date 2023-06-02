@@ -1,4 +1,4 @@
-package FidoWin;
+package FidoBrook;
 
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
@@ -13,8 +13,8 @@ package FidoWin;
 {$LONGSTRINGS ON}
 {$OPENSTRINGS ON}
 {$OPTIMIZATION OFF}
-{$OVERFLOWCHECKS OFF}
-{$RANGECHECKS OFF}
+{$OVERFLOWCHECKS ON}
+{$RANGECHECKS ON}
 {$REFERENCEINFO ON}
 {$SAFEDIVIDE OFF}
 {$STACKFRAMES ON}
@@ -30,18 +30,19 @@ package FidoWin;
 
 requires
   rtl,
+  soaprtl,
   dbrtl,
-  adortl,
+  IndySystem,
+  IndyProtocols,
+  IndyCore,
+  RESTComponents,
   Spring.Base,
-  FireDAC,
-  FireDACCommonDriver,
-  FireDACCommon,
-  FidoCore;
+  FidoCore{$IFDEF MSWINDOWS},
+  BrookTardigrade{$ENDIF};
 
 contains
-  Fido.win.Db.Connection.NestedTransactions.Ado in 'Db\Fido.win.Db.Connection.NestedTransactions.Ado.pas',
-  Fido.Win.Db.Connections.Ado in 'Db\Fido.Win.Db.Connections.Ado.pas',
-  Fido.Win.Db.Transaction.Handler.ADO in 'Db\Fido.Win.Db.Transaction.Handler.ADO.pas',
-  Fido.win.Db.StatementExecutor.ADO in 'Db\Fido.win.Db.StatementExecutor.ADO.pas';
+  Fido.Api.Server.Brook in 'Api\Server\Fido.Api.Server.Brook.pas',
+  Fido.DesignPatterns.Adapter.TBrookHTTPRequestAsIHTTPRequest in 'DesignPatterns\Fido.DesignPatterns.Adapter.TBrookHTTPRequestAsIHTTPRequest.pas',
+  Fido.DesignPatterns.Adapter.TBrookHTTPResponseAsIHTTPResponse in 'DesignPatterns\Fido.DesignPatterns.Adapter.TBrookHTTPResponseAsIHTTPResponse.pas';
 
 end.

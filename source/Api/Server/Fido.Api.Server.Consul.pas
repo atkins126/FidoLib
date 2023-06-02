@@ -33,9 +33,9 @@ uses
   Spring.Collections,
 
   Fido.Utilities,
-  Fido.Api.Server.Resource.Attributes,
   Fido.Api.Server.Intf,
-
+  Fido.Api.Server.Resource.Attributes,
+  Fido.Web.Server.Intf,
   Fido.Consul.Service.Intf,
   Fido.Api.Server.Consul.Resource.Attributes;
 
@@ -51,13 +51,16 @@ type
     constructor Create(const ApiServer: IApiServer; const ConsulService: IConsulService; const ServiceName: string; const Timeout: Cardinal);
     destructor Destroy; override;
 
-    Function Port: Word;
+    function Port: Word;
     function IsActive: Boolean;
     procedure SetActive(const Value: Boolean);
+    procedure SetWebServer(const WebServer: IWebServer);
     procedure RegisterResource(const Resource: TObject);
-    procedure RegisterRequestMiddleware(const Name: string; const Step: TRequestMiddlewareFunc);
-    procedure RegisterResponseMiddleware(const Name: string; const Step: TResponseMiddlewareProc);
-    procedure RegisterExceptionMiddleware(const MiddlewareProc: TExceptionMiddlewareProc);
+    procedure RegisterRequestMiddleware(const Name: string; const Step: TApiRequestMiddlewareFunc);
+    procedure RegisterResponseMiddleware(const Name: string; const Step: TApiResponseMiddlewareProc);
+    procedure RegisterExceptionMiddleware(const MiddlewareProc: TApiExceptionMiddlewareProc);
+    procedure RegisterGlobalMiddleware(const MiddlewareProc: TApiGlobalMiddlewareProc);
+    procedure RegisterFormatExceptionToResponse(const FormatExceptionToResponseProc: TApiFormatExceptionToResponseProc);
   end;
 
 implementation
@@ -94,14 +97,24 @@ begin
   Result := FApiServer.Port;
 end;
 
-procedure TConsulAwareApiServer.RegisterExceptionMiddleware(const MiddlewareProc: TExceptionMiddlewareProc);
+procedure TConsulAwareApiServer.RegisterExceptionMiddleware(const MiddlewareProc: TApiExceptionMiddlewareProc);
 begin
   FApiServer.RegisterExceptionMiddleware(MiddlewareProc)
 end;
 
+procedure TConsulAwareApiServer.RegisterFormatExceptionToResponse(const FormatExceptionToResponseProc: TApiFormatExceptionToResponseProc);
+begin
+  FApiServer.RegisterFormatExceptionToResponse(FormatExceptionToResponseProc)
+end;
+
+procedure TConsulAwareApiServer.RegisterGlobalMiddleware(const MiddlewareProc: TApiGlobalMiddlewareProc);
+begin
+  FApiServer.RegisterGlobalMiddleware(MiddlewareProc);
+end;
+
 procedure TConsulAwareApiServer.RegisterRequestMiddleware(
   const Name: string;
-  const Step: TRequestMiddlewareFunc);
+  const Step: TApiRequestMiddlewareFunc);
 begin
   FApiServer.RegisterRequestMiddleware(Name, Step);
 end;
@@ -148,7 +161,7 @@ end;
 
 procedure TConsulAwareApiServer.RegisterResponseMiddleware(
   const Name: string;
-  const Step: TResponseMiddlewareProc);
+  const Step: TApiResponseMiddlewareProc);
 begin
   FApiServer.RegisterResponseMiddleware(Name, Step);
 end;
@@ -160,6 +173,11 @@ begin
     True: FConsulService.Register(FServiceName, FApiServer.Port, FHealthEndpoint, FTimeout);
     False: FConsulService.Deregister(FTimeout);
   end;
+end;
+
+procedure TConsulAwareApiServer.SetWebServer(const WebServer: IWebServer);
+begin
+  FApiServer.SetWebServer(WebServer);
 end;
 
 end.

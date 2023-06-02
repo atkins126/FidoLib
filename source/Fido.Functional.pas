@@ -42,7 +42,7 @@ type
 
   EFunctionalContext = class(EFidoException);
 
-  OnFailureEvent<T> = reference to function(const RaisedException: TObject): T;
+  OnFailureEvent<T> = reference to function(const E: Exception): Nullable<T>;
   OnSuccessEvent<T> = reference to function(const Value: T): T;
 
   Context<T> = record
@@ -52,9 +52,9 @@ type
     FunctorProc = reference to procedure(const Value: T);
   private
     FAssigned: string;
-    FFunc: TFunc<T>;
+    FFunc: Func<T>;
 
-    FAsyncFunc: TFunc<T>;
+    FAsyncFunc: Func<T>;
     FTimeout: Cardinal;
     FFuture: IFuture<T>;
 
@@ -62,16 +62,16 @@ type
   public
     constructor New(const Value: T); overload;
     constructor New(const Value: Context<T>); overload;
-    constructor New(const Func: TFunc<T>; const Timeout: Cardinal; const Paused: Boolean = False); overload;
-    constructor New(const Func: TFunc<T>); overload;
+    constructor New(const Func: Func<T>; const Timeout: Cardinal; const Paused: Boolean = False); overload;
+    constructor New(const Func: Func<T>); overload;
 
     function IsAssigned: Boolean;
     function IsAsync: Boolean;
 
     class operator Implicit(const Value: Context<T>): T;
-    class operator Implicit(const Value: Context<T>): TFunc<T>;
+    class operator Implicit(const Value: Context<T>): Func<T>;
     class operator Implicit(const Value: T): Context<T>;
-    class operator Implicit(const Func: TFunc<T>): Context<T>;
+    class operator Implicit(const Func: Func<T>): Context<T>;
 
     function Value: T;
 
@@ -114,13 +114,25 @@ end;
 
 {$REGION ' Context<T> '}
 function Context<T>.Map<TOut>(const Func: MonadFunc<TOut>): Context<TOut>;
+var
+  LSelf: Context<T>;
 begin
-  Result := Func(Self);
+  LSelf := Self;
+  Result := function: TOut
+    begin
+      Result := Func(LSelf);
+    end;
 end;
 
 function Context<T>.Map<TOut>(const Func: FunctorFunc<TOut>): Context<TOut>;
+var
+  LSelf: Context<T>;
 begin
-  Result := Context<TOut>.New(Func(Self));
+  LSelf := Self;
+  Result := Context<TOut>.New(function: TOut
+    begin
+      Result := Func(LSelf)
+    end);
 end;
 
 function Context<T>.MapAsync<TOut>(
@@ -131,8 +143,7 @@ var
   LSelf: Context<T>;
 begin
   LSelf := Self;
-  Result := Context<TOut>.New(
-    function: TOut
+  Result := Context<TOut>.New(function: TOut
     begin
       Result := Func(LSelf);
     end,
@@ -148,8 +159,7 @@ var
   LSelf: Context<T>;
 begin
   LSelf := Self;
-  Result := Context<TOut>.New(
-    function: TOut
+  Result := Context<TOut>.New(function: TOut
     begin
       Result := Func(LSelf);
     end,
@@ -157,12 +167,12 @@ begin
     Paused);
 end;
 
-class operator Context<T>.Implicit(const Func: TFunc<T>): Context<T>;
+class operator Context<T>.Implicit(const Func: Func<T>): Context<T>;
 begin
   Result := Context<T>.New(Func);
 end;
 
-class operator Context<T>.Implicit(const Value: Context<T>): TFunc<T>;
+class operator Context<T>.Implicit(const Value: Context<T>): Func<T>;
 begin
   if Assigned(Value.FAsyncFunc) then
   begin
@@ -202,7 +212,7 @@ end;
 
 class operator Context<T>.Implicit(const Value: Context<T>): T;
 var
-  Func: TFunc<T>;
+  Func: Func<T>;
 begin
   Func := Value;
   Result := Func();
@@ -235,18 +245,18 @@ begin
     end;
 end;
 
-constructor Context<T>.New(const Func: TFunc<T>; const Timeout: Cardinal; const Paused: Boolean);
+constructor Context<T>.New(const Func: Func<T>; const Timeout: Cardinal; const Paused: Boolean);
 begin
   FAssigned := 'True';
   FAsyncFunc := Func;
   FTimeout := Timeout;
   FFuture := nil;
   if not Paused then
-    FFuture := TTask.Future<T>(FAsyncFunc);
+    FFuture := TTask.Future<T>(TFunc<T>(FAsyncFunc));
   FFunc := nil;
 end;
 
-constructor Context<T>.New(const Func: TFunc<T>);
+constructor Context<T>.New(const Func: Func<T>);
 begin
   FAssigned := 'True';
   FAsyncFunc := nil;
@@ -262,7 +272,7 @@ begin
   if not Assigned(FAsyncFunc) then
     raise EFunctionalContext.Create('Context is not async.');
 
-  FFuture := TTask.Future<T>(FAsyncFunc);
+  FFuture := TTask.Future<T>(TFunc<T>(FAsyncFunc));
 end;
 
 constructor Context<T>.New(const Value: Context<T>);
@@ -339,3 +349,4 @@ end;
 {$ENDREGION}
 
 end.
+
